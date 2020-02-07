@@ -54,7 +54,7 @@ func parseRequestBody(request *http.Request) requestPayloadStruct {
 	err := decoder.Decode(&requestPayload)
 
 	if err != nil {
-		log.Println(err.Error())
+		log.Println("body error", err.Error())
 	}
 
 	return requestPayload
@@ -69,6 +69,7 @@ func serveReverseProxy(target string, res http.ResponseWriter, req *http.Request
 	proxy := httputil.NewSingleHostReverseProxy(url)
 
 	// Update the headers to allow for SSL redirection
+	log.Println(url.Host, url.Scheme)
 	req.URL.Host = url.Host
 	req.URL.Scheme = url.Scheme
 	req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
@@ -81,6 +82,7 @@ func serveReverseProxy(target string, res http.ResponseWriter, req *http.Request
 // Given a request send it to the appropriate url
 func handleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
 	requestPayload := parseRequestBody(req)
+	log.Println("proxy", requestPayload.ProxyCondition)
 	url := getProxyUrl(requestPayload.ProxyCondition)
 
 	logRequestPayload(requestPayload, url)
@@ -102,7 +104,7 @@ func getListenAddress() string {
 }
 
 func logSetup() {
-	url := os.Getenv("url")
+	url := os.Getenv("URL")
 	log.Printf("Server will run on: %s\n", getListenAddress())
 	log.Printf("Redirecting to a url: %s\n", url)
 }
@@ -114,6 +116,6 @@ func main() {
 	// start server
 	http.HandleFunc("/", handleRequestAndRedirect)
 	if err := http.ListenAndServe(getListenAddress(), nil); err != nil {
-		log.Panicln(err.Error())
+		log.Panicln("server error", err.Error())
 	}
 }
