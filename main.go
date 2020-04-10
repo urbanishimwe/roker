@@ -54,7 +54,7 @@ func changeURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	URL = url
-	fmt.Printf("now URL forward to: %s\n", url)
+	log.Printf("now URL forward to: %s\n", url)
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Success")
