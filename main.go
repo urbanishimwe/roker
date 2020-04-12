@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -8,9 +9,14 @@ import (
 	"os"
 )
 
+// URL stores your ngrok dynamic address
+var (
+	URL    = os.Getenv("URL")
+	secret = os.Getenv("SECRET")
+)
+
 // Serve a reverse proxy for a given url
 func serveReverseProxy(target string, res http.ResponseWriter, req *http.Request) {
-	// parse the url
 	url, _ := url.Parse(target)
 
 	// create the reverse proxy
@@ -24,14 +30,36 @@ func serveReverseProxy(target string, res http.ResponseWriter, req *http.Request
 	proxy.ServeHTTP(res, req)
 }
 
-// Given a request send it to the appropriate url
-func handleRequestAndRedirect(res http.ResponseWriter, req *http.Request) {
-	log.Println("from ", req.RemoteAddr)
-	url := os.Getenv("URL")
-	serveReverseProxy(url, res, req)
+func handleRequestAndRedirect(w http.ResponseWriter, r *http.Request) {
+	log.Println("from ", r.RemoteAddr)
+	serveReverseProxy(URL, w, r)
 }
 
-// Get env var or default
+func changeURL(w http.ResponseWriter, r *http.Request) {
+	log.Println("from ", r.RemoteAddr)
+
+	if err := r.ParseForm(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Internal error while Parsing")
+		return
+	}
+
+	key := r.URL.Query().Get("secret")
+	url := r.URL.Query().Get("url")
+
+	if key != secret {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprintf(w, "Forbidden")
+		return
+	}
+
+	URL = url
+	log.Printf("now URL forward to: %s\n", url)
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Success")
+}
+
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
@@ -44,15 +72,11 @@ func getListenAddress() string {
 	return ":" + port
 }
 
-func logSetup() {
-	url := os.Getenv("URL")
-	log.Printf("Server will run on %s\n", getListenAddress())
-	log.Printf("Redirecting to a url: %s\n", url)
-}
-
 func main() {
-	logSetup()
+	log.Printf("Server will run on %s\n", getListenAddress())
+	log.Printf("Redirecting to a url: %s\n", URL)
 
+	http.HandleFunc("/update_ngrok", changeURL)
 	http.HandleFunc("/", handleRequestAndRedirect)
 	if err := http.ListenAndServe(getListenAddress(), nil); err != nil {
 		log.Panicln("server error", err.Error())
